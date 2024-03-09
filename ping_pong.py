@@ -5,9 +5,11 @@ from PySide6.QtGui import *
 class PingPong(QWidget):
     def __init__(self): 
         super(PingPong, self).__init__()
+        self.timer = QBasicTimer()
         self.ui()
         self.pong_stats()
 
+        self.start()
         self.show()
         
     def ui(self):
@@ -18,27 +20,29 @@ class PingPong(QWidget):
         
     def pong_stats(self):
         self.px = (self.width()/2)-100
-        self.py = self.height()
-        self.spd = 50;
+        self.dx = 0
+        self.refresh = 50
+
+    def start(self):
+        self.timer.start(self.refresh, self)
 
     def keyPressEvent(self, event):
         k = event.key()
         if k == Qt.Key.Key_Left:
-            self.px -= self.spd
-            self.update()
+            self.dx = -50
         if k == Qt.Key.Key_Right:
-            self.px += self.spd
-            self.update()
+            self.dx = 50
         
     def keyReleaseEvent(self, event):
         k = event.key()
-        if k == Qt.Key.Key_Left:
-            self.update()
-        elif k == Qt.Key.Key_Right:
+        if k == Qt.Key.Key_Left or k == Qt.Key.Key_Right:
+            self.dx = 0
+
+    def timerEvent(self, event):
+        if event.timerId() == self.timer.timerId():
             self.update()
 
     def paintEvent(self, event):
-        print("paint")
         painter = QPainter()
         painter.begin(self)
         self.paint_paddle(painter)
@@ -46,11 +50,11 @@ class PingPong(QWidget):
 
     def paint_paddle(self, painter): 
         color = QColor(0x808080)
-        painter.fillRect(self.px, self.py, 200, 10, color)
+        self.px += self.dx
+        painter.fillRect(self.px, self.height()-200, 200, 10, color)
 
     def resizeEvent(self, event):
         self.px = (self.width()/2)-100
-        self.py = self.height()-200
         self.update()
 
 if __name__ == "__main__": 
