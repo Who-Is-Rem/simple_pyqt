@@ -18,7 +18,7 @@ class PingPong(QMainWindow):
 
         # timer for modifying update() rate
         self.timer = QBasicTimer()
-        self.timer.start(50, self)
+        self.timer.start(20, self)
 
         # set of keys to know what keys have been pressed
         self.keys = set()
@@ -53,9 +53,13 @@ class PingPong(QMainWindow):
     Event to increase the speed of update triggering with a timer
     """
     def timerEvent(self, event):
+        print(self.keys)
         if event.timerId() == self.timer.timerId():
-            # update player speeds
             for p in self.players:
+                # decelerate for existing players if no key is pressed for respective player
+                if not (p.left in self.keys or p.right in self.keys) and abs(p.speed) > 0:
+                    p.accelerate(0)
+                # update player speeds
                 p.px += p.speed
             self.update()
 
@@ -66,9 +70,11 @@ class PingPong(QMainWindow):
     def keyPressEvent(self, event):
         self.keys.add(event.key())
         for p in self.players:
-            if not (p.left and p.right in self.keys):
+            if not p.left & p.right in self.keys:
+                # accelerate left 
                 if p.left in self.keys:
                     p.accelerate(-1)
+                # accelerate right 
                 if p.right in self.keys:
                     p.accelerate(1)
 
@@ -77,11 +83,9 @@ class PingPong(QMainWindow):
     the players are pressed
     """
     def keyReleaseEvent(self, event):
-        self.keys.remove(event.key())
-        # decelerate for existing players if no key is pressed for respective player
-        for p in self.players:
-            if p.left and p.right not in self.keys:
-                p.accelerate(0)
+        try:
+            self.keys.remove(event.key())
+        except: pass
 
     """
     Change the player position when the window resets in size
@@ -110,8 +114,8 @@ class Player():
 
         # data for speed
         self.speed = 0
-        self.max_spd = 60
-        self.acceleration = 5
+        self.max_spd = 40
+        self.acceleration = 10
 
         # movement keys
         self.left = int(left)
