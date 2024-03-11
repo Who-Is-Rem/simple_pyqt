@@ -31,14 +31,67 @@ class PingPong(QMainWindow):
         self.p_height = self.height()-150
         self.player.move(int((self.width()/2)-(self.player.width()/2)), self.p_height)
 
+        # initialize bullet 
+        self.init_bullet = Bullet(self)
+        self.bullet_shot = False
+        self.init_bullet.move(int(self.width()/2), self.p_height-int(self.init_bullet.height())-1)
+        self.bullets = []
+
         self.show()
 
+    def timerEvent(self, event):
+        if event.timerId() == self.timer.timerId(): 
+            for b in self.bullets:
+                # move the bullets 
+                nx = b.x() + b.xspd
+                ny = b.y() + b.yspd
+                b.move(nx, ny)
+
+                # check for collision and adjust velocity accordingly 
+                self.bullet_collision(b)
+
+    def bullet_collision(self, bullet):
+        objs = self.board.objects
+        # check for collision with vertical border 
+        if bullet.collision(self.board.left) or bullet.collision(self.board.right): 
+            bullet.rev_x()
+        # check for collision with top border
+        elif bullet.collision(self.board.top):
+            bullet.rev_y()
+        # check for collision with player 
+        elif bullet.collision(self.player):
+            # reverse y spd of the bullet 
+            bullet.rev_y()
+            # adjust x spd of the bullet dependent of the location hit on the player
+            bullet.rev_x()
+        # check for collision with obstacles and delete them and adjust bullet accordingly 
+        else: 
+            for o in objs: 
+                if (bullet.collision(o)):
+                    print(3)
+                    self.board.objects.remove(o)
+                    bullet.rev_y()
+                    bullet.rev_x()
+
+                
     """
     Event to track mouse movement and connect it to the player
     """
     def mouseMoveEvent(self, event):
         pos_x = int(event.position().x())-int(self.player.width()/2)
         self.player.move(pos_x, self.p_height)
+        if not self.bullet_shot: 
+            self.init_bullet.move(pos_x+int(self.player.width()/2), self.p_height-int(self.init_bullet.height())-1)
+
+    """
+    Event to detect space presses and initialize the game by shooting the bullet 
+    """
+    def keyPressEvent(self, event):
+        k = event.key()
+        if k == Qt.Key.Key_Space and not self.bullet_shot: 
+            self.bullet_shot = True 
+            self.init_bullet.yspd = -self.init_bullet.dy 
+            self.bullets.append(self.init_bullet)
 
 """
 Class for making objects that can collide
@@ -46,14 +99,41 @@ Class for making objects that can collide
 class Bullet(QFrame):
     def __init__(self, parent):
         super().__init__(parent)
+        self.setFixedSize(20, 20)
+        self.yspd = 0
+        self.xspd = 0
+        self.dy = 10 
+        self.dx = 10 
 
+    """
+    Reverse the speed of the bullet in the x direction 
+    """
+    def rev_x(self):
+        self.xspd = -self.xspd 
+
+    """
+    Reverse the speed of the bullet in the y direction 
+    """
+    def rev_y(self): 
+        self.yspd = -self.yspd
+
+    """
+    Check for collisions between the bullet and some other widget 
+    """
     def collision(self, other:QWidget): 
-        dim = self.contentsRect()
-        other_dim = other.contentsRect()
-        if other.x() < dim.x() | (dim.x()+dim.width()) < (other.x()+other_dim.width()):
-            if other.y() < dim.y() | (dim.y()+dim.height()) < (other.y()+other_dim.height()):
+        if other.x() < self.x() | (self.x()+self.width()) < (other.x()+other.width()):
+            if other.y() < self.y() | (self.y()+self.height()) < (other.y()-other.height()):
                 return True
         return False
+
+    """
+    Paints a circular bullet that fills the frame
+    """
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        circle_path = QPainterPath()
+        circle_path.addEllipse(self.contentsRect())
+        painter.fillPath(circle_path, QColor(0x0000FF))
 
 """
 Class containing the main board of the game which has the collision objects and borders
@@ -76,15 +156,12 @@ class Board(QFrame):
         layout.addLayout(self.make_grid(), 1, 1, Qt.AlignmentFlag.AlignCenter)
         
         # the borders of the "map"
-        top = Bounds(self, "horizontal")
-        left = Bounds(self,  "vertical")
-        right = Bounds(self, "vertical")
-        self.objects.append(top)
-        self.objects.append(left)
-        self.objects.append(right)
-        layout.addWidget(top, 0, 0, 1, 3, Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(left, 0, 0, 5, 1, Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(right, 0, 2, 5, 1, Qt.AlignmentFlag.AlignTop)
+        self.top = Bounds(self, "horizontal")
+        self.left = Bounds(self,  "vertical")
+        self.right = Bounds(self, "vertical")
+        layout.addWidget(self.top, 0, 0, 1, 3, Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(self.left, 0, 0, 5, 1, Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(self.right, 0, 2, 5, 1, Qt.AlignmentFlag.AlignTop)
 
         # set the layout 
         self.setLayout(layout)
