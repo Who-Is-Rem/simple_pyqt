@@ -76,9 +76,9 @@ class Board(QFrame):
         layout.addLayout(self.make_grid(), 1, 1, Qt.AlignmentFlag.AlignCenter)
         
         # the borders of the "map"
-        top = Bounds(self, "vertical")
-        left = Bounds(self, "horizontal")
-        right = Bounds(self, "horizontal")
+        top = Bounds(self, "horizontal")
+        left = Bounds(self,  "vertical")
+        right = Bounds(self, "vertical")
         self.objects.append(top)
         self.objects.append(left)
         self.objects.append(right)
@@ -130,10 +130,9 @@ class Bounds(QFrame):
         if orient != "vertical" and orient != "horizontal": print(f"Orientation: {orient}. Bad Arg") 
         if orient == "vertical":
             self.setFixedSize(10, int(parent.parentWidget().maximumHeight()*(4/5)))
-            self.setStyleSheet("background-color:blue")
         elif orient == "horizontal":
             self.setFixedSize(int(parent.parentWidget().maximumWidth()-30), 10)
-            self.setStyleSheet("background-color:green")
+        self.setStyleSheet("background-color:grey")
 
 """
 Class representing the player, i.e. the paddle
