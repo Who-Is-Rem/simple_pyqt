@@ -6,149 +6,141 @@ from PySide6.QtWidgets import *
 Class for the main window for the Ping Pong Game
 """
 class PingPong(QMainWindow):
-    def __init__(self, num_players=0):
+    def __init__(self):
         super().__init__()
-        assert num_players >=0 and num_players < 3
-        self.num_players = num_players
-
         # initialize window data
         self.setWindowTitle("Ping Pong")
+        self.setMaximumSize(1440, 900)
+        self.setFixedSize(1440, 900)
         self.setWindowState(Qt.WindowState.WindowFullScreen)
         self.setStyleSheet("background-color:black;")
+        self.setMouseTracking(True)
+        self.grabMouse()
 
         # timer for modifying update() rate
         self.timer = QBasicTimer()
         self.timer.start(20, self)
 
-        # set of keys to know what keys have been pressed
-        self.keys = set()
+        # make the board 
+        self.board = Board(self, 5,5)
+        self.board.make_layout()
+        self.setCentralWidget(self.board)
 
-        # initialize the players
-        self.initPlayer()
+        # initialize the player 
+        self.player = Player(self)
+        self.p_height = self.height()-150
+        self.player.move(int((self.width()/2)-(self.player.width()/2)), self.p_height)
 
         self.show()
 
     """
-    initialize the players' data such as position, key presses, and the players themself
+    Event to track mouse movement and connect it to the player
     """
-    def initPlayer(self):
-        self.players = []
-        player_ypos = [self.height()-150, 150]
-        player_xpos = (self.width()/2)-100
-        player_keys = [(Qt.Key.Key_Left, Qt.Key.Key_Right), (Qt.Key.Key_A, Qt.Key.Key_D)]
-        for i in range(self.num_players):
-            self.players.append(Player(player_xpos, player_ypos[i], player_keys[i][0], player_keys[i][1]))
-
-    """
-    Event to paint the players on the main window whenever update() gets triggered
-    """
-    def paintEvent(self, event):
-        painter = QPainter()
-        painter.begin(self)
-        for p in self.players:
-            painter.fillRect(p.px, p.py, p.width, p.height, QColor(0x808080))
-        painter.end()
-
-    """
-    Event to increase the speed of update triggering with a timer
-    """
-    def timerEvent(self, event):
-        print(self.keys)
-        if event.timerId() == self.timer.timerId():
-            for p in self.players:
-                # decelerate for existing players if no key is pressed for respective player
-                if not (p.left in self.keys or p.right in self.keys) and abs(p.speed) > 0:
-                    p.accelerate(0)
-                # update player speeds
-                p.px += p.speed
-            self.update()
-
-
-    """
-    Detect key presses and modify the players' speeds accordingly
-    """
-    def keyPressEvent(self, event):
-        self.keys.add(event.key())
-        for p in self.players:
-            if not p.left & p.right in self.keys:
-                # accelerate left 
-                if p.left in self.keys:
-                    p.accelerate(-1)
-                # accelerate right 
-                if p.right in self.keys:
-                    p.accelerate(1)
-
-    """
-    Detect key releases and decrease the players' speeds if neither of the respective keys for
-    the players are pressed
-    """
-    def keyReleaseEvent(self, event):
-        try:
-            self.keys.remove(event.key())
-        except: pass
-
-    """
-    Change the player position when the window resets in size
-    """
-    def resizeEvent(self, event):
-        player_xpos = (self.width()/2)-100
-        for p in self.players:
-            p.px = player_xpos
-        if self.players[0] != 0:
-            self.players[0].py = self.height()-150
-
+    def mouseMoveEvent(self, event):
+        pos_x = int(event.position().x())-int(self.player.width()/2)
+        self.player.move(pos_x, self.p_height)
 
 """
-Class for players i.e. the paddles in the game
+Class for making objects that can collide
 """
-class Player():
-    def __init__(self, x, y, left:Qt.Key, right:Qt.Key):
-        # data for positions
-        self.direction = 2
-        self.px = x
-        self.py = y
+class Collision(QFrame):
+    def __init__(self, parent):
+        super().__init__(parent)
 
-        # data for size
-        self.width = 250
-        self.height = 10
+    def collision(self, other:QWidget): 
+        dim = self.contentsRect()
+        other_dim = other.contentsRect()
+        if other.x() < dim.x() | (dim.x()+dim.width()) < (other.x()+other_dim.width()):
+            if other.y() < dim.y() | (dim.y()+dim.height()) < (other.y()+other_dim.height()):
+                return True
+        return False
 
-        # data for speed
-        self.speed = 0
-        self.max_spd = 40
-        self.acceleration = 10
-
-        # movement keys
-        self.left = int(left)
-        self.right = int(right)
+"""
+Class containing the main board of the game which has the collision objects and borders
+"""
+class Board(QFrame):
+    def __init__(self, parent, rows, cols):
+        super().__init__(parent)
+        self.side = 25
+        self.rows = rows
+        self.cols = cols
+        self.objects = []
 
     """
-    Modifies speed and position according to the direction of acceleration
-    described by num
-
-    num:
-    0 - decelerate
-    1 - accelerate in the +x
-    -1 - accelerate in the -x
+    Makes the layout for where the borders and target objects should be 
     """
-    def accelerate(self, num=0):
-        # accelerate
-        if abs(self.speed) < self.max_spd:
-            if num == 1:
-                self.speed += self.acceleration
-            elif num == -1:
-                self.speed -= self.acceleration
-        # decelerate
-        if num == 0:
-            if self.speed != 0:
-                tsp = abs(self.speed) - self.acceleration
-                if self.speed < 0:
-                    self.speed = -tsp
-                else:
-                    self.speed = tsp
-            elif abs(self.speed) < 5:
-                self.speed = 0
+    def make_layout(self):
+        layout = QGridLayout()
+
+        # The blocks to be broken 
+        layout.addLayout(self.make_grid(), 1, 1, Qt.AlignmentFlag.AlignCenter)
+        
+        # the borders of the "map"
+        layout.addWidget(Bounds(self, "horizontal"), 0, 0, 1, 3, Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(Bounds(self, "vertical"), 0, 0, 3, 1, Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(Bounds(self, "vertical"), 0, 2, 3, 1, Qt.AlignmentFlag.AlignTop)
+
+        # set the layout 
+        self.setLayout(layout)
+
+    """
+    Makes a square grid of targets to hit 
+    """
+    def make_grid(self):
+        layout = QGridLayout()
+        layout.setVerticalSpacing(1)
+        layout.setHorizontalSpacing(1)
+        for i in range(self.rows):
+            row = []
+            for j in range(self.cols):
+                sq = Target(self, self.side)
+                row.append(sq)
+                layout.addWidget(sq, i, j, 1, 1)
+            self.objects.append(row)
+        return layout
+
+    """
+    Makes one side of the border
+    """
+    def make_edge(self, orient):
+        return Bounds(self, orient)
+
+"""
+Class representing the targets to be shot at 
+"""
+class Target(Collision):
+    def __init__(self, parent, side):
+        super().__init__(parent)
+        self.side = side
+        self.setFixedSize(self.side, self.side)
+        self.setStyleSheet("background-color:red")
+
+"""
+Class representing the boundaries for the game 
+"""
+class Bounds(Collision):
+    def __init__(self, parent, orient:str):
+        super().__init__(parent)
+        if orient != "vertical" and orient != "horizontal": print(f"Orientation: {orient}. Bad Arg") 
+        if orient == "vertical":
+            self.setFixedSize(10, int(parent.parentWidget().maximumHeight()*(5/6)))
+            self.setStyleSheet("background-color:blue")
+        elif orient == "horizontal":
+            self.setFixedSize(int(parent.parentWidget().maximumWidth()-20), 10)
+            self.setStyleSheet("background-color:green")
+
+"""
+Class representing the player, i.e. the paddle
+"""
+class Player(Collision):
+    def __init__(self, parent): 
+        super().__init__(parent)
+        self.setFixedSize(250, 10)
+        self.setStyleSheet("background-color:grey;")
+        self.px = 0
+        self.py = 0
 
 if __name__ == "__main__":
     app = QApplication()
-    pong = PingPong(1)
+    pong = PingPong()
     app.exec()
