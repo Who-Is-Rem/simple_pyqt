@@ -43,7 +43,7 @@ class PingPong(QMainWindow):
 """
 Class for making objects that can collide
 """
-class Collision(QFrame):
+class Bullet(QFrame):
     def __init__(self, parent):
         super().__init__(parent)
 
@@ -76,9 +76,15 @@ class Board(QFrame):
         layout.addLayout(self.make_grid(), 1, 1, Qt.AlignmentFlag.AlignCenter)
         
         # the borders of the "map"
-        layout.addWidget(Bounds(self, "horizontal"), 0, 0, 1, 3, Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(Bounds(self, "vertical"), 0, 0, 3, 1, Qt.AlignmentFlag.AlignTop)
-        layout.addWidget(Bounds(self, "vertical"), 0, 2, 3, 1, Qt.AlignmentFlag.AlignTop)
+        top = Bounds(self, "vertical")
+        left = Bounds(self, "horizontal")
+        right = Bounds(self, "horizontal")
+        self.objects.append(top)
+        self.objects.append(left)
+        self.objects.append(right)
+        layout.addWidget(top, 0, 0, 1, 3, Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(left, 0, 0, 5, 1, Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(right, 0, 2, 5, 1, Qt.AlignmentFlag.AlignTop)
 
         # set the layout 
         self.setLayout(layout)
@@ -108,7 +114,7 @@ class Board(QFrame):
 """
 Class representing the targets to be shot at 
 """
-class Target(Collision):
+class Target(QFrame):
     def __init__(self, parent, side):
         super().__init__(parent)
         self.side = side
@@ -118,21 +124,21 @@ class Target(Collision):
 """
 Class representing the boundaries for the game 
 """
-class Bounds(Collision):
+class Bounds(QFrame):
     def __init__(self, parent, orient:str):
         super().__init__(parent)
         if orient != "vertical" and orient != "horizontal": print(f"Orientation: {orient}. Bad Arg") 
         if orient == "vertical":
-            self.setFixedSize(10, int(parent.parentWidget().maximumHeight()*(5/6)))
+            self.setFixedSize(10, int(parent.parentWidget().maximumHeight()*(4/5)))
             self.setStyleSheet("background-color:blue")
         elif orient == "horizontal":
-            self.setFixedSize(int(parent.parentWidget().maximumWidth()-20), 10)
+            self.setFixedSize(int(parent.parentWidget().maximumWidth()-30), 10)
             self.setStyleSheet("background-color:green")
 
 """
 Class representing the player, i.e. the paddle
 """
-class Player(Collision):
+class Player(QFrame):
     def __init__(self, parent): 
         super().__init__(parent)
         self.setFixedSize(250, 10)
