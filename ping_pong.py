@@ -1,12 +1,13 @@
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
+import math
 
 """
 Class for the main window for the Ping Pong Game
 """
 class PingPong(QMainWindow):
-    def __init__(self):
+    def __init__(self, cols, rows):
         super().__init__()
         # initialize window data
         self.setWindowTitle("Ping Pong")
@@ -19,10 +20,10 @@ class PingPong(QMainWindow):
 
         # timer for modifying update() rate
         self.timer = QBasicTimer()
-        self.timer.start(20, self)
+        self.timer.start(10, self)
 
         # make the board 
-        self.board = Board(self, 5,5)
+        self.board = Board(self, cols, rows)
         self.board.make_layout()
         self.setCentralWidget(self.board)
 
@@ -39,6 +40,9 @@ class PingPong(QMainWindow):
 
         self.show()
 
+    """
+    Event to increase update speed and detect collisions 
+    """
     def timerEvent(self, event):
         if event.timerId() == self.timer.timerId(): 
             for b in self.bullets:
@@ -50,10 +54,14 @@ class PingPong(QMainWindow):
                 # check for collision and adjust velocity accordingly 
                 self.bullet_collision(b)
 
+    """
+    Helper method to change bullet speed according to collisions 
+    """
     def bullet_collision(self, bullet):
-        objs = self.board.objects
         # check for collision with vertical border 
-        if bullet.collision(self.board.left) or bullet.collision(self.board.right): 
+        if bullet.collision(self.board.left):
+            bullet.rev_x()
+        if bullet.collision(self.board.right): 
             bullet.rev_x()
         # check for collision with top border
         elif bullet.collision(self.board.top):
@@ -63,17 +71,31 @@ class PingPong(QMainWindow):
             # reverse y spd of the bullet 
             bullet.rev_y()
             # adjust x spd of the bullet dependent of the location hit on the player
-            bullet.rev_x()
-        # check for collision with obstacles and delete them and adjust bullet accordingly 
-        else: 
-            for o in objs: 
-                if (bullet.collision(o)):
-                    print(3)
-                    self.board.objects.remove(o)
-                    bullet.rev_y()
-                    bullet.rev_x()
+            angle = self.player_bullet(bullet)
+            dx = bullet.dx * (math.sin(angle))
+            bullet.xspd = dx
 
-                
+        # check for collision with obstacles and delete them and adjust bullet accordingly 
+        hit = False
+        for i in range(len(self.board.objects)):
+            row = self.board.objects[i]
+            for o in row[::1]:
+                if bullet.collision(o):
+                    hit = True
+                    row.remove(o)
+                    o.hide()
+        if hit: bullet.rev_y(); bullet.rev_x()
+
+    """
+    Helper method to get the relative angle the bullet should bounce off the player 
+    """
+    def player_bullet(self, bullet):
+        b_x = bullet.x() + (bullet.width()/2)
+        p_center = self.player.x()+(self.player.width()/2)
+        rel_x = b_x - p_center
+        ratio = rel_x/(self.player.width()/2)
+        return ratio*(math.pi/2)
+
     """
     Event to track mouse movement and connect it to the player
     """
@@ -96,14 +118,14 @@ class PingPong(QMainWindow):
 """
 Class for making objects that can collide
 """
-class Bullet(QFrame):
+class Bullet(QWidget):
     def __init__(self, parent):
         super().__init__(parent)
         self.setFixedSize(20, 20)
         self.yspd = 0
         self.xspd = 0
-        self.dy = 10 
-        self.dx = 10 
+        self.dy = 5
+        self.dx = 5
 
     """
     Reverse the speed of the bullet in the x direction 
@@ -121,8 +143,10 @@ class Bullet(QFrame):
     Check for collisions between the bullet and some other widget 
     """
     def collision(self, other:QWidget): 
-        if other.x() < self.x() | (self.x()+self.width()) < (other.x()+other.width()):
-            if other.y() < self.y() | (self.y()+self.height()) < (other.y()-other.height()):
+        if ((other.x()-3 < self.x() < other.x()+other.width()+3) or 
+            (other.x()-3 < self.x()+self.width() < other.x()+other.width()+3)):
+            if ((other.y()-3 < self.y() < other.y()+other.height()+3) or 
+                (other.y()-3 < self.y()+self.height() < other.y()+other.height()+3)):
                 return True
         return False
 
@@ -134,13 +158,16 @@ class Bullet(QFrame):
         circle_path = QPainterPath()
         circle_path.addEllipse(self.contentsRect())
         painter.fillPath(circle_path, QColor(0x0000FF))
+        painter.end()
 
 """
 Class containing the main board of the game which has the collision objects and borders
 """
 class Board(QFrame):
-    def __init__(self, parent, rows, cols):
+    def __init__(self, parent, cols, rows):
         super().__init__(parent)
+        assert cols <= 45
+        assert rows <= 20
         self.side = 25
         self.rows = rows
         self.cols = cols
@@ -171,11 +198,13 @@ class Board(QFrame):
     """
     def make_grid(self):
         layout = QGridLayout()
-        layout.setVerticalSpacing(1)
-        layout.setHorizontalSpacing(1)
+        layout.setVerticalSpacing(0)
+        layout.setHorizontalSpacing(0)
         for i in range(self.rows):
+            layout.setRowMinimumHeight(i, self.side+2)
             row = []
             for j in range(self.cols):
+                layout.setColumnMinimumWidth(j, self.side+2)
                 sq = Target(self, self.side)
                 row.append(sq)
                 layout.addWidget(sq, i, j, 1, 1)
@@ -206,7 +235,7 @@ class Bounds(QFrame):
         super().__init__(parent)
         if orient != "vertical" and orient != "horizontal": print(f"Orientation: {orient}. Bad Arg") 
         if orient == "vertical":
-            self.setFixedSize(10, int(parent.parentWidget().maximumHeight()*(4/5)))
+            self.setFixedSize(10, int(parent.parentWidget().maximumHeight()*(7/8)))
         elif orient == "horizontal":
             self.setFixedSize(int(parent.parentWidget().maximumWidth()-30), 10)
         self.setStyleSheet("background-color:grey")
@@ -224,5 +253,5 @@ class Player(QFrame):
 
 if __name__ == "__main__":
     app = QApplication()
-    pong = PingPong()
+    pong = PingPong(45, 20)
     app.exec()
